@@ -13,10 +13,10 @@ class ScrollToTopStatusBarHandler extends StatefulWidget {
   final Widget child;
 
   @override
-  _ScrollToTopStatusBarState createState() => _ScrollToTopStatusBarState();
+  ScrollToTopStatusBarState createState() => ScrollToTopStatusBarState();
 }
 
-class _ScrollToTopStatusBarState extends State<ScrollToTopStatusBarHandler> {
+class ScrollToTopStatusBarState extends State<ScrollToTopStatusBarHandler> {
   @override
   void initState() {
     super.initState();
@@ -49,7 +49,8 @@ class _ScrollToTopStatusBarState extends State<ScrollToTopStatusBarHandler> {
   }
 
   void _handleStatusBarTap(BuildContext context) {
-    final ScrollController? controller = PrimaryScrollController.of(context);
+    final ScrollController? controller =
+        PrimaryScrollController.maybeOf(context);
     if (controller != null && controller.hasClients) {
       controller.animateTo(
         0.0,

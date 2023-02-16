@@ -12,7 +12,7 @@ const double kAspectRatio = 0.6;
 const double kHeight = 200.0;
 
 class SheetConfigurationPage extends StatelessWidget {
-  const SheetConfigurationPage({Key? key}) : super(key: key);
+  const SheetConfigurationPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +81,7 @@ class SheetConfigurationPage extends StatelessWidget {
 }
 
 class FilterEditor extends StatelessWidget {
-  const FilterEditor({Key? key}) : super(key: key);
+  const FilterEditor({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -329,7 +329,7 @@ class SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.headline6,
+        style: Theme.of(context).textTheme.titleLarge,
       ),
     );
   }

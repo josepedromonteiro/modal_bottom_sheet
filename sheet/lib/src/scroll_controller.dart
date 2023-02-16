@@ -1,4 +1,3 @@
-import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sheet/sheet.dart';
 
@@ -140,6 +139,7 @@ class SheetPrimaryScrollPosition extends ScrollPositionWithSingleContext {
             velocity,
           ),
           context.vsync,
+          true,
         ),
       );
 
@@ -179,6 +179,7 @@ class SheetPrimaryScrollPosition extends ScrollPositionWithSingleContext {
             velocity,
           ),
           context.vsync,
+          true,
         ),
       );
       return;

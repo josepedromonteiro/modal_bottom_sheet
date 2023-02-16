@@ -74,7 +74,6 @@ class BouncingSheetPhysics extends ScrollPhysics with SheetPhysics {
 
   @override
   double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
-    //return offset;
     assert(offset != 0.0);
     assert(position.minScrollExtent <= position.maxScrollExtent);
 
@@ -143,13 +142,27 @@ class BouncingSheetPhysics extends ScrollPhysics with SheetPhysics {
       return true;
     }());
     if (!overflowViewport) {
+      // overscroll
       if (position.viewportDimension <= position.pixels &&
-          position.pixels < value) // hit top edge
+          position.pixels < value) {
         return value - position.pixels;
-      if (position.pixels < 0 && position.pixels > value) // hit bottom edge
-        return value - position.pixels;
+      }
+      // hit top edge
+      if (value < position.viewportDimension &&
+          position.viewportDimension < position.pixels) {
+        return value - position.viewportDimension;
+      }
     }
-
+    // underscroll
+    if (value < position.pixels &&
+        position.pixels <= position.minScrollExtent) {
+      return value - position.pixels;
+    }
+    // hit bottom edge
+    if (position.pixels < position.maxScrollExtent &&
+        position.maxScrollExtent < value) {
+      return value - position.maxScrollExtent;
+    }
     return 0.0;
   }
 
@@ -159,7 +172,11 @@ class BouncingSheetPhysics extends ScrollPhysics with SheetPhysics {
     final Tolerance tolerance = this.tolerance;
     if (position.outOfRange) {
       return BouncingScrollSimulation(
-        spring: spring,
+        spring: const SpringDescription(
+          mass: 1.2,
+          stiffness: 200.0,
+          damping: 25,
+        ),
         position: position.pixels,
         velocity: velocity,
         leadingExtent: position.minScrollExtent,
@@ -167,7 +184,7 @@ class BouncingSheetPhysics extends ScrollPhysics with SheetPhysics {
         tolerance: tolerance,
       );
     }
-    return null;
+    return super.createBallisticSimulation(position, velocity);
   }
 
   // The ballistic simulation here decelerates more slowly than the one for
@@ -216,23 +233,141 @@ class NoMomentumSheetPhysics extends ScrollPhysics with SheetPhysics {
 
   @override
   double applyBoundaryConditions(ScrollMetrics position, double value) {
-    if (position.viewportDimension <= position.pixels &&
-        position.pixels < value) // hit top edge
+    // underscroll
+    if (value < position.pixels &&
+        position.pixels <= position.minScrollExtent) {
       return value - position.pixels;
-    if (position.pixels < 0 && position.pixels > value) // hit bottom edge
+    }
+    if (position.maxScrollExtent <= position.pixels &&
+        position.pixels < value) {
+      // overscroll
       return value - position.pixels;
+    }
+    if (value < position.minScrollExtent &&
+        position.minScrollExtent < position.pixels) {
+      // hit top edge
+      return value - position.minScrollExtent;
+    }
+    if (position.pixels < position.maxScrollExtent &&
+        position.maxScrollExtent < value) {
+      // hit bottom edge
+      return value - position.maxScrollExtent;
+    }
     return 0.0;
-  }
 
-  @override
-  double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
-    return offset;
+    // if (position.viewportDimension <= position.pixels &&
+    //     position.pixels < value) // hit top edge
+    //   return value - position.pixels;
+    // if (position.pixels < 0 && position.pixels > value) // hit bottom edge
+    //   return value - position.pixels;
+    // return 0.0;
   }
 
   @override
   Simulation? createBallisticSimulation(
       ScrollMetrics position, double velocity) {
+    final Tolerance tolerance = this.tolerance;
+    if (position.outOfRange) {
+      double? end;
+      if (position.pixels > position.maxScrollExtent) {
+        end = position.maxScrollExtent;
+      } else if (position.pixels < position.minScrollExtent) {
+        end = position.minScrollExtent;
+      }
+      assert(end != null);
+      return ScrollSpringSimulation(
+        spring,
+        position.pixels,
+        end!,
+        math.min(0.0, velocity),
+        tolerance: tolerance,
+      );
+    }
     return null;
+  }
+}
+
+class ClampingSheetPhysics extends ScrollPhysics with SheetPhysics {
+  /// Creates sheet physics that has no momentum after the user stops dragging.
+  const ClampingSheetPhysics({
+    ScrollPhysics? parent,
+  }) : super(parent: parent);
+
+  @override
+  ClampingSheetPhysics applyTo(ScrollPhysics? ancestor) {
+    return ClampingSheetPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    assert(() {
+      if (value == position.pixels) {
+        throw FlutterError.fromParts(<DiagnosticsNode>[
+          ErrorSummary(
+              '$runtimeType.applyBoundaryConditions() was called redundantly.'),
+          ErrorDescription(
+            'The proposed new position, $value, is exactly equal to the current position of the '
+            'given ${position.runtimeType}, ${position.pixels}.\n'
+            'The applyBoundaryConditions method should only be called when the value is '
+            'going to actually change the pixels, otherwise it is redundant.',
+          ),
+          DiagnosticsProperty<ScrollPhysics>(
+              'The physics object in question was', this,
+              style: DiagnosticsTreeStyle.errorProperty),
+          DiagnosticsProperty<ScrollMetrics>(
+              'The position object in question was', position,
+              style: DiagnosticsTreeStyle.errorProperty),
+        ]);
+      }
+      return true;
+    }());
+    // hit top edge
+    if (position.viewportDimension <= position.pixels &&
+        position.pixels < value) {
+      return value - position.pixels;
+    }
+    // hit bottom edge
+    if (position.pixels < 0 && position.pixels > value) {
+      return value - position.pixels;
+    }
+    return 0.0;
+  }
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    final Tolerance tolerance = this.tolerance;
+    if (position.outOfRange) {
+      double? end;
+      if (position.pixels > position.maxScrollExtent) {
+        end = position.maxScrollExtent;
+      }
+      if (position.pixels < position.minScrollExtent) {
+        end = position.minScrollExtent;
+      }
+      assert(end != null);
+      return ScrollSpringSimulation(
+        spring,
+        position.pixels,
+        end!,
+        math.min(0.0, velocity),
+        tolerance: tolerance,
+      );
+    }
+    if (velocity.abs() < tolerance.velocity) {
+      return null;
+    }
+    if (velocity > 0.0 && position.pixels >= position.maxScrollExtent) {
+      return null;
+    }
+    if (velocity < 0.0 && position.pixels <= position.minScrollExtent) {
+      return null;
+    }
+    return ClampingScrollSimulation(
+      position: position.pixels,
+      velocity: velocity,
+      tolerance: tolerance,
+    );
   }
 }
 
@@ -305,19 +440,25 @@ class SnapSheetPhysics extends ScrollPhysics with SheetPhysics {
       ScrollMetrics position, double velocity) {
     // If we're out of range and not headed back in range, defer to the parent
     // ballistics, which should put us back in range at a page boundary.
-    if ((velocity <= 0.0 && position.pixels <= position.minScrollExtent) ||
-        (velocity >= 0.0 && position.pixels >= position.maxScrollExtent))
-      return super.createBallisticSimulation(position, velocity);
+    // if ((velocity <= 0.0 && position.pixels <= position.minScrollExtent) ||
+    //     (velocity >= 0.0 && position.pixels >= position.maxScrollExtent))
+    //   return super.createBallisticSimulation(position, velocity);
     final Tolerance tolerance = this.tolerance;
     final double target = _getTargetPixels(position, tolerance, velocity);
-    if (target != position.pixels)
-      return ScrollSpringSimulation(spring, position.pixels, target, velocity,
-          tolerance: tolerance);
+    if (target != position.pixels) {
+      return ScrollSpringSimulation(
+        const SpringDescription(damping: 25, stiffness: 200, mass: 1.2),
+        position.pixels,
+        target,
+        velocity.clamp(-200, 200),
+        tolerance: tolerance,
+      );
+    }
     return null;
   }
 
   @override
-  bool get allowImplicitScrolling => true;
+  bool get allowImplicitScrolling => false;
 
   int getPageFromPixels(double pixels, double extent) {
     final double actual = math.max(0.0, pixels) / math.max(1.0, extent);
@@ -359,9 +500,7 @@ class SnapSheetPhysics extends ScrollPhysics with SheetPhysics {
 
   int? _getPage(ScrollMetrics position) {
     assert(
-      !position.hasPixels ||
-          (position.minScrollExtent != null &&
-              position.maxScrollExtent != null),
+      !position.hasPixels || position.hasContentDimensions,
       'Page value is only available after content dimensions are established.',
     );
     return !position.hasPixels

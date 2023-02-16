@@ -65,7 +65,7 @@ typedef SheetDecorationBuilder = Widget Function(
 class Sheet extends StatelessWidget {
   /// Creates a material bottom sheet.
   const Sheet({
-    Key? key,
+    super.key,
     required this.child,
     this.controller,
     this.physics,
@@ -81,12 +81,11 @@ class Sheet extends StatelessWidget {
     this.resizable = false,
     this.padding = EdgeInsets.zero,
     this.minResizableExtent,
-  })  : decorationBuilder = null,
-        super(key: key);
+  }) : decorationBuilder = null;
 
   /// Creates a bottom sheet with no default appearance.
   const Sheet.raw({
-    Key? key,
+    super.key,
     required this.child,
     SheetDecorationBuilder? decorationBuilder,
     this.controller,
@@ -103,8 +102,7 @@ class Sheet extends StatelessWidget {
         shape = null,
         elevation = null,
         backgroundColor = null,
-        clipBehavior = null,
-        super(key: key);
+        clipBehavior = null;
 
   final Widget child;
 
@@ -246,14 +244,15 @@ class Sheet extends StatelessWidget {
             child: child,
           );
         };
-
+    final SheetController? effectiveController =
+        controller ?? DefaultSheetController.of(context);
     final double? initialExtent =
         this.initialExtent?.clamp(minExtent ?? 0, maxExtent ?? double.infinity);
     return SheetScrollable(
       initialExtent: initialExtent,
       minInteractionExtent: minInteractionExtent,
       physics: physics,
-      controller: controller,
+      controller: effectiveController,
       axisDirection: AxisDirection.down,
       scrollBehavior: SheetBehaviour(),
       viewportBuilder: (BuildContext context, ViewportOffset offset) {
@@ -273,7 +272,7 @@ class Sheet extends StatelessWidget {
                   offset: offset,
                   minExtent: minResizableExtent ?? 0,
                   child: Builder(
-                    key: const Key('_sheet_builder'),
+                    key: const Key('_sheet_child'),
                     builder: (BuildContext context) {
                       return decorationBuilder(
                         context,
@@ -285,45 +284,6 @@ class Sheet extends StatelessWidget {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
-}
-
-class SheetMediaQuery extends StatelessWidget {
-  const SheetMediaQuery({Key? key, required this.child}) : super(key: key);
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final SheetPosition position = Sheet.of(context)!.controller.position;
-    final EdgeInsets padding = MediaQuery.of(context).padding;
-    return LayoutBuilder(
-      builder: (
-        BuildContext context,
-        BoxConstraints constraints,
-      ) {
-        return AnimatedBuilder(
-          animation: position,
-          builder: (BuildContext context, Widget? child) {
-            final double pixels = position.hasPixels ? position.pixels : 0;
-            final double viewportDimension = position.hasViewportDimension
-                ? position.viewportDimension
-                : double.infinity;
-            final double top = math.max(
-              0.0,
-              padding.top - (viewportDimension - pixels),
-            );
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                padding: padding.copyWith(top: top),
-              ),
-              child: child!,
-            );
-          },
-          child: child,
         );
       },
     );
@@ -371,14 +331,14 @@ class SheetController extends ScrollController {
     if (hasClients) {
       final ScrollPosition position = positions.first;
       if (position is SheetPosition) {
-        WidgetsBinding.instance!.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           _animation.parent = position.animation;
         });
 
         return;
       }
     }
-    WidgetsBinding.instance!.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _animation.parent = kAlwaysDismissedAnimation;
     });
     return;
@@ -431,8 +391,9 @@ class SheetController extends ScrollController {
   void relativeJumpTo(double offset) {
     assert(positions.isNotEmpty,
         'ScrollController not attached to any scroll views.');
-    for (final ScrollPosition position in positions)
+    for (final ScrollPosition position in positions) {
       (position as SheetPosition).relativeJumpTo(offset);
+    }
   }
 }
 
@@ -473,8 +434,11 @@ class SheetPosition extends ScrollPositionWithSingleContext {
   Future<void> relativeAnimateTo(double to,
       {required Duration duration, required Curve curve}) {
     assert(to >= 0 && to <= 1);
-    return super
-        .animateTo(to * maxScrollExtent, duration: duration, curve: curve);
+    return super.animateTo(
+      pixelsFromRelativeOffset(to, minScrollExtent, maxScrollExtent),
+      duration: duration,
+      curve: curve,
+    );
   }
 
   @override
@@ -486,7 +450,9 @@ class SheetPosition extends ScrollPositionWithSingleContext {
 
   void relativeJumpTo(double to) {
     assert(to >= 0 && to <= 1);
-    return super.jumpTo(to * maxScrollExtent);
+    final value =
+        pixelsFromRelativeOffset(to, minScrollExtent, maxScrollExtent);
+    return super.jumpTo(value);
   }
 
   @override
@@ -512,13 +478,21 @@ class SheetPosition extends ScrollPositionWithSingleContext {
 
   @override
   double setPixels(double newPixels) {
-    _controller.value = (newPixels / maxScrollExtent).clamp(0, 1);
+    _controller.value = relativeOffsetFromPixels(
+      newPixels,
+      minScrollExtent,
+      maxScrollExtent,
+    );
     return super.setPixels(newPixels);
   }
 
   @override
   void forcePixels(double value) {
-    _controller.value = (value / maxScrollExtent).clamp(0, 1);
+    _controller.value = relativeOffsetFromPixels(
+      value,
+      minScrollExtent,
+      maxScrollExtent,
+    );
     super.forcePixels(value);
   }
 
@@ -534,8 +508,33 @@ class SheetPosition extends ScrollPositionWithSingleContext {
     // Clamp initial extent to maxScrollExtent
     if (!hasContentDimensions) {
       correctPixels(pixels.clamp(minScrollExtent, maxScrollExtent));
+      _controller.value = relativeOffsetFromPixels(
+        pixels,
+        minScrollExtent,
+        maxScrollExtent,
+      );
     }
     return super.applyContentDimensions(minScrollExtent, maxScrollExtent);
+  }
+
+  static double relativeOffsetFromPixels(
+    double pixels,
+    double minScrollExtent,
+    double maxScrollExtent,
+  ) {
+    if (minScrollExtent == maxScrollExtent) return 1;
+    final value =
+        ((pixels - minScrollExtent) / (maxScrollExtent - minScrollExtent))
+            .clamp(0.0, 1.0);
+    return value;
+  }
+
+  static double pixelsFromRelativeOffset(
+    double offset,
+    double minScrollExtent,
+    double maxScrollExtent,
+  ) {
+    return minScrollExtent + offset * (maxScrollExtent - minScrollExtent);
   }
 }
 
@@ -549,9 +548,7 @@ class SheetViewport extends SingleChildRenderObjectWidget {
     Widget? child,
     required this.fit,
     required this.clipBehavior,
-  })  : assert(axisDirection != null),
-        assert(clipBehavior != null),
-        super(key: key, child: child);
+  }) : super(key: key, child: child);
 
   final AxisDirection axisDirection;
   final ViewportOffset offset;
@@ -561,8 +558,8 @@ class SheetViewport extends SingleChildRenderObjectWidget {
   final SheetFit fit;
 
   @override
-  _RenderSheetViewport createRenderObject(BuildContext context) {
-    return _RenderSheetViewport(
+  RenderSheetViewport createRenderObject(BuildContext context) {
+    return RenderSheetViewport(
       axisDirection: axisDirection,
       offset: offset,
       clipBehavior: clipBehavior,
@@ -574,7 +571,7 @@ class SheetViewport extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(
-      BuildContext context, _RenderSheetViewport renderObject) {
+      BuildContext context, RenderSheetViewport renderObject) {
     // Order dependency: The offset setter reads the axis direction.
     renderObject
       ..axisDirection = axisDirection
@@ -586,10 +583,10 @@ class SheetViewport extends SingleChildRenderObjectWidget {
   }
 }
 
-class _RenderSheetViewport extends RenderBox
+class RenderSheetViewport extends RenderBox
     with RenderObjectWithChildMixin<RenderBox>
     implements RenderAbstractViewport {
-  _RenderSheetViewport({
+  RenderSheetViewport({
     AxisDirection axisDirection = AxisDirection.down,
     required ViewportOffset offset,
     double cacheExtent = RenderAbstractViewport.defaultCacheExtent,
@@ -598,11 +595,7 @@ class _RenderSheetViewport extends RenderBox
     SheetFit fit = SheetFit.expand,
     double? minExtent,
     double? maxExtent,
-  })  : assert(axisDirection != null),
-        assert(offset != null),
-        assert(cacheExtent != null),
-        assert(clipBehavior != null),
-        _axisDirection = axisDirection,
+  })  : _axisDirection = axisDirection,
         _offset = offset,
         _fit = fit,
         _minExtent = minExtent,
@@ -615,7 +608,6 @@ class _RenderSheetViewport extends RenderBox
   AxisDirection get axisDirection => _axisDirection;
   AxisDirection _axisDirection;
   set axisDirection(AxisDirection value) {
-    assert(value != null);
     if (value == _axisDirection) return;
     _axisDirection = value;
     markNeedsLayout();
@@ -626,11 +618,10 @@ class _RenderSheetViewport extends RenderBox
   ViewportOffset get offset => _offset;
   ViewportOffset _offset;
   set offset(ViewportOffset value) {
-    assert(value != null);
     if (value == _offset) return;
-    if (attached) _offset.removeListener(_hasScrolled);
+    if (attached) _offset.removeListener(_hasDragged);
     _offset = value;
-    if (attached) _offset.addListener(_hasScrolled);
+    if (attached) _offset.addListener(_hasDragged);
     markNeedsLayout();
   }
 
@@ -638,7 +629,6 @@ class _RenderSheetViewport extends RenderBox
   double get cacheExtent => _cacheExtent;
   double _cacheExtent;
   set cacheExtent(double value) {
-    assert(value != null);
     if (value == _cacheExtent) return;
     _cacheExtent = value;
     markNeedsLayout();
@@ -648,7 +638,6 @@ class _RenderSheetViewport extends RenderBox
   SheetFit get fit => _fit;
   SheetFit _fit;
   set fit(SheetFit value) {
-    assert(value != null);
     if (value == _fit) return;
     _fit = value;
     markNeedsLayout();
@@ -660,7 +649,6 @@ class _RenderSheetViewport extends RenderBox
   Clip get clipBehavior => _clipBehavior;
   Clip _clipBehavior = Clip.none;
   set clipBehavior(Clip value) {
-    assert(value != null);
     if (value != _clipBehavior) {
       _clipBehavior = value;
       markNeedsPaint();
@@ -668,14 +656,14 @@ class _RenderSheetViewport extends RenderBox
     }
   }
 
-  void _hasScrolled() {
-    if (offset.pixels > _maxScrollExtent) {
-      _maxScrollExtentDuringOverflow ??= _maxScrollExtent;
+  void _hasDragged() {
+    if (!_isOverflow && offset.pixels > child!.size.height) {
       _childExtentBeforeOverflow ??= child!.size.height;
+      _isOverflow = true;
       markNeedsLayout();
-    } else if (offset.pixels < (_childExtentBeforeOverflow ?? 0)) {
-      _maxScrollExtentDuringOverflow = null;
+    } else if (isOverflow && offset.pixels < _childExtentBeforeOverflow!) {
       _childExtentBeforeOverflow = null;
+      _isOverflow = false;
       markNeedsLayout();
     }
     markNeedsPaint();
@@ -692,12 +680,12 @@ class _RenderSheetViewport extends RenderBox
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    _offset.addListener(_hasScrolled);
+    _offset.addListener(_hasDragged);
   }
 
   @override
   void detach() {
-    _offset.removeListener(_hasScrolled);
+    _offset.removeListener(_hasDragged);
     super.detach();
   }
 
@@ -739,8 +727,7 @@ class _RenderSheetViewport extends RenderBox
 
   double get _maxScrollExtent {
     assert(hasSize);
-    if (_maxScrollExtentDuringOverflow != null)
-      return _maxScrollExtentDuringOverflow!;
+    if (_childExtentBeforeOverflow != null) return _childExtentBeforeOverflow!;
     if (child == null) return 0.0;
     switch (axis) {
       case Axis.horizontal:
@@ -750,8 +737,9 @@ class _RenderSheetViewport extends RenderBox
     }
   }
 
-  double? _maxScrollExtentDuringOverflow;
   double? _childExtentBeforeOverflow;
+  bool _isOverflow = false;
+  bool get isOverflow => _isOverflow;
 
   //BoxConstraints _getInnerConstraints(BoxConstraints constraints) {
   //  switch (axis) {
@@ -801,27 +789,25 @@ class _RenderSheetViewport extends RenderBox
     if (child == null) {
       size = constraints.smallest;
     } else {
-      final double? minHeight = _maxScrollExtentDuringOverflow != null
-          ? _childExtentBeforeOverflow! +
-              offset.pixels -
-              _maxScrollExtentDuringOverflow!
-          : null;
       final bool expand = fit == SheetFit.expand;
-      double height = maxExtent ?? constraints.biggest.height;
-      height = math.max(height, offset.pixels);
-      if (minHeight == null) {
-        height = height.clamp(0, constraints.maxHeight);
-      } else {
-        height = math.max(height, minHeight);
+      final double maxExtent = this.maxExtent ?? constraints.maxHeight;
+      double maxHeight = maxExtent.clamp(0, constraints.maxHeight);
+      double minHeight = expand ? maxHeight : 0;
+
+      if (isOverflow) {
+        final double overflowHeight =
+            _childExtentBeforeOverflow! + offset.pixels;
+        maxHeight = overflowHeight;
+        minHeight = overflowHeight;
       }
 
-      final BoxConstraints newContstraints = BoxConstraints(
-        minHeight: minHeight ?? (expand ? height : 0),
-        maxHeight: height,
+      final BoxConstraints childContstraints = BoxConstraints(
+        minHeight: minHeight,
+        maxHeight: maxHeight,
         minWidth: constraints.minWidth,
         maxWidth: constraints.maxWidth,
       );
-      child!.layout(newContstraints, parentUsesSize: true);
+      child!.layout(childContstraints, parentUsesSize: true);
       size = constraints.biggest;
     }
 
@@ -832,7 +818,6 @@ class _RenderSheetViewport extends RenderBox
   Offset get _paintOffset => _paintOffsetForPosition(offset.pixels);
 
   Offset _paintOffsetForPosition(double position) {
-    assert(axisDirection != null);
     switch (axisDirection) {
       case AxisDirection.up:
         return Offset(0.0, position - child!.size.height + size.height);
@@ -895,8 +880,9 @@ class _RenderSheetViewport extends RenderBox
 
   @override
   Rect? describeApproximatePaintClip(RenderObject? child) {
-    if (child != null && _shouldClipAtPaintOffset(_paintOffset))
+    if (child != null && _shouldClipAtPaintOffset(_paintOffset)) {
       return Offset.zero & size;
+    }
     return null;
   }
 
@@ -919,8 +905,9 @@ class _RenderSheetViewport extends RenderBox
   RevealedOffset getOffsetToReveal(RenderObject target, double alignment,
       {Rect? rect}) {
     rect ??= target.paintBounds;
-    if (target is! RenderBox)
+    if (target is! RenderBox) {
       return RevealedOffset(offset: offset.pixels, rect: rect);
+    }
 
     final RenderBox targetBox = target;
     final Matrix4 transform = targetBox.getTransformTo(child);
@@ -931,7 +918,6 @@ class _RenderSheetViewport extends RenderBox
     final double targetMainAxisExtent;
     final double mainAxisExtent;
 
-    assert(axisDirection != null);
     switch (axisDirection) {
       case AxisDirection.up:
         mainAxisExtent = size.height;
@@ -968,33 +954,35 @@ class _RenderSheetViewport extends RenderBox
     Duration duration = Duration.zero,
     Curve curve = Curves.ease,
   }) {
-    if (!offset.allowImplicitScrolling) {
-      return super.showOnScreen(
-        descendant: descendant,
-        rect: rect,
-        duration: duration,
-        curve: curve,
-      );
-    }
-
-    final Rect? newRect = RenderViewportBase.showInViewport(
-      descendant: descendant,
-      viewport: this,
-      offset: offset,
-      rect: rect,
-      duration: duration,
-      curve: curve,
-    );
-    super.showOnScreen(
-      rect: newRect,
-      duration: duration,
-      curve: curve,
-    );
+    return;
+    // TODO(jaime): check showOnScreen method beheves when keyboard appears on
+    // the screen
+    // if (!offset.allowImplicitScrolling) {
+    //   return super.showOnScreen(
+    //     descendant: descendant,
+    //     rect: rect,
+    //     duration: duration,
+    //     curve: curve,
+    //   );
+    // }
+    //
+    // final Rect? newRect = RenderViewportBase.showInViewport(
+    //   descendant: descendant,
+    //   viewport: this,
+    //   offset: offset,
+    //   rect: rect,
+    //   duration: duration,
+    //   curve: curve,
+    // );
+    // super.showOnScreen(
+    //   rect: newRect,
+    //   duration: duration,
+    //   curve: curve,
+    // );
   }
 
   @override
   Rect describeSemanticsClip(RenderObject child) {
-    assert(axis != null);
     switch (axis) {
       case Axis.vertical:
         return Rect.fromLTRB(

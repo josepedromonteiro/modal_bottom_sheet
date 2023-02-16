@@ -14,7 +14,6 @@
 
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
@@ -56,11 +55,7 @@ class SheetScrollable extends StatefulWidget {
     this.scrollBehavior,
     this.initialExtent,
     this.minInteractionExtent = 0,
-  })  : assert(axisDirection != null),
-        assert(dragStartBehavior != null),
-        assert(viewportBuilder != null),
-        assert(excludeFromSemantics != null),
-        assert(semanticChildCount == null || semanticChildCount >= 0),
+  })  : assert(semanticChildCount == null || semanticChildCount >= 0),
         super(key: key);
 
   /// The direction in which this widget scrolls.
@@ -150,7 +145,7 @@ class SheetScrollable extends StatefulWidget {
   ///
   /// Some subtypes of [ScrollView] can infer this value automatically. For
   /// example [ListView] will use the number of widgets in the child list,
-  /// while the [new ListView.separated] constructor will use half that amount.
+  /// while the [ListView.separated] constructor will use half that amount.
   ///
   /// For [CustomScrollView] and other types which do not receive a builder
   /// or list of widgets, the child count must be explicitly provided.
@@ -278,8 +273,9 @@ class SheetScrollable extends StatefulWidget {
       scrollable = SheetScrollable.of(context);
     }
 
-    if (futures.isEmpty || duration == Duration.zero)
+    if (futures.isEmpty || duration == Duration.zero) {
       return Future<void>.value();
+    }
     if (futures.length == 1) return futures.single;
     return Future.wait<void>(futures).then<void>((List<void> _) => null);
   }
@@ -293,9 +289,7 @@ class _ScrollableScope extends InheritedWidget {
     required this.scrollable,
     required this.position,
     required Widget child,
-  })  : assert(scrollable != null),
-        assert(child != null),
-        super(key: key, child: child);
+  }) : super(key: key, child: child);
 
   final SheetState scrollable;
   final ScrollPosition position;
@@ -385,13 +379,14 @@ class SheetState extends State<SheetScrollable>
     _persistedScrollOffset.value = offset;
     // [saveOffset] is called after a scrolling ends and it is usually not
     // followed by a frame. Therefore, manually flush restoration data.
-    ServicesBinding.instance!.restorationManager.flushData();
+    ServicesBinding.instance.restorationManager.flushData();
   }
 
   @override
   void initState() {
-    if (widget.controller == null)
+    if (widget.controller == null) {
       _fallbackScrollController = SheetController();
+    }
     super.initState();
   }
 
@@ -403,8 +398,9 @@ class SheetState extends State<SheetScrollable>
 
   bool _shouldSheetPhysicsUpdate(
       ScrollPhysics? newPhysics, ScrollPhysics? oldPhysics) {
-    if (newPhysics is! SheetPhysics || oldPhysics is! SheetPhysics)
+    if (newPhysics is! SheetPhysics || oldPhysics is! SheetPhysics) {
       return false;
+    }
     return newPhysics.shouldReload(oldPhysics);
   }
 
@@ -473,8 +469,9 @@ class SheetState extends State<SheetScrollable>
   @override
   @protected
   void setSemanticsActions(Set<SemanticsAction> actions) {
-    if (_gestureDetectorKey.currentState != null)
+    if (_gestureDetectorKey.currentState != null) {
       _gestureDetectorKey.currentState!.replaceSemanticsActions(actions);
+    }
   }
 
   // GESTURE RECOGNITION AND POINTER IGNORING
@@ -553,9 +550,10 @@ class SheetState extends State<SheetScrollable>
     }
     _lastCanDrag = canDrag;
     _lastAxisDirection = widget.axis;
-    if (_gestureDetectorKey.currentState != null)
+    if (_gestureDetectorKey.currentState != null) {
       _gestureDetectorKey.currentState!
           .replaceGestureRecognizers(_gestureRecognizers);
+    }
   }
 
   @override
@@ -665,7 +663,7 @@ class SheetState extends State<SheetScrollable>
           _targetScrollOffsetForPointerScroll(delta);
       // Only express interest in the event if it would actually result in a scroll.
       if (delta != 0.0 && targetScrollOffset != position.pixels) {
-        GestureBinding.instance!.pointerSignalResolver
+        GestureBinding.instance.pointerSignalResolver
             .register(event, _handlePointerScroll);
       }
     }
@@ -773,8 +771,7 @@ class _ScrollSemantics extends SingleChildRenderObjectWidget {
     required this.allowImplicitScrolling,
     required this.semanticChildCount,
     Widget? child,
-  })  : assert(position != null),
-        assert(semanticChildCount == null || semanticChildCount >= 0),
+  })  : assert(semanticChildCount == null || semanticChildCount >= 0),
         super(key: key, child: child);
 
   final ScrollPosition position;
@@ -809,7 +806,6 @@ class _RenderScrollSemantics extends RenderProxyBox {
   })  : _position = position,
         _allowImplicitScrolling = allowImplicitScrolling,
         _semanticChildCount = semanticChildCount,
-        assert(position != null),
         super(child) {
     position.addListener(markNeedsSemanticsUpdate);
   }
@@ -818,7 +814,6 @@ class _RenderScrollSemantics extends RenderProxyBox {
   ScrollPosition get position => _position;
   ScrollPosition _position;
   set position(ScrollPosition value) {
-    assert(value != null);
     if (value == _position) return;
     _position.removeListener(markNeedsSemanticsUpdate);
     _position = value;
@@ -881,8 +876,9 @@ class _RenderScrollSemantics extends RenderProxyBox {
       if (child.isTagged(RenderViewport.excludeFromScrolling)) {
         excluded.add(child);
       } else {
-        if (!child.hasFlag(SemanticsFlag.isHidden))
+        if (!child.hasFlag(SemanticsFlag.isHidden)) {
           firstVisibleIndex ??= child.indexInParent;
+        }
         included.add(child);
       }
     }
@@ -952,8 +948,7 @@ class ScrollIncrementDetails {
   const ScrollIncrementDetails({
     required this.type,
     required this.metrics,
-  })  : assert(type != null),
-        assert(metrics != null);
+  });
 
   /// The type of scroll this is (e.g. line, page, etc.).
   ///
@@ -976,8 +971,7 @@ class ScrollIntent extends Intent {
   const ScrollIntent({
     required this.direction,
     this.type = ScrollIncrementType.line,
-  })  : assert(direction != null),
-        assert(type != null);
+  });
 
   /// The direction in which to scroll the scrollable containing the focused
   /// widget.
