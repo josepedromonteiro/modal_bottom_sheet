@@ -524,7 +524,7 @@ class SheetPosition extends ScrollPositionWithSingleContext {
   ) {
     if (minScrollExtent == maxScrollExtent) return 1;
     final value =
-        ((pixels - minScrollExtent) / (maxScrollExtent - minScrollExtent))
+        ((pixels - minScrollExtent) / ((maxScrollExtent) - minScrollExtent))
             .clamp(0.0, 1.0);
     return value;
   }
@@ -534,7 +534,7 @@ class SheetPosition extends ScrollPositionWithSingleContext {
     double minScrollExtent,
     double maxScrollExtent,
   ) {
-    return minScrollExtent + offset * (maxScrollExtent - minScrollExtent);
+    return minScrollExtent + offset * ((maxScrollExtent) - minScrollExtent);
   }
 }
 

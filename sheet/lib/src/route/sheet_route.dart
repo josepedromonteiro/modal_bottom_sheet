@@ -9,7 +9,7 @@ import 'package:sheet/sheet.dart';
 
 // TODO(jaime): Arbitrary values, keep them or make SheetRoute abstract
 const double _kWillPopThreshold = 0.8;
-const Duration _kSheetTransitionDuration = Duration(milliseconds: 400);
+const Duration _kSheetTransitionDuration = Duration(milliseconds: 600);
 const Color _kBarrierColor = Color(0x59000000);
 
 /// A modal route that overlays a widget over the current route and animates
@@ -38,6 +38,7 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
     this.physics,
     this.animationCurve,
     Duration? duration,
+    Duration? reverseDuration,
     this.sheetLabel,
     this.barrierLabel,
     this.barrierColor = _kBarrierColor,
@@ -47,6 +48,8 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
     this.decorationBuilder,
     RouteSettings? settings,
   })  : transitionDuration = duration ?? _kSheetTransitionDuration,
+        reverseTransitionDuration =
+            reverseDuration ?? _kSheetTransitionDuration,
         super(settings: settings, fullscreenDialog: true);
 
   /// Builds the primary contents of the route.
@@ -92,6 +95,9 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
   @override
   final Duration transitionDuration;
 
+  @override
+  final Duration reverseTransitionDuration;
+
   /// The semantic label used for a sheet modal route.
   final String? sheetLabel;
 
@@ -112,6 +118,7 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
   AnimationController? _routeAnimationController;
 
   late final SheetController _sheetController;
+
   SheetController get sheetController => _sheetController;
 
   @override
@@ -132,6 +139,7 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
     _routeAnimationController = AnimationController(
       vsync: navigator!,
       duration: transitionDuration,
+      reverseDuration: reverseTransitionDuration,
     );
     return _routeAnimationController!;
   }
@@ -235,6 +243,7 @@ class SheetPage<T> extends Page<T> {
       this.physics,
       this.animationCurve,
       Duration? duration,
+      Duration? reverseDuration,
       this.sheetLabel,
       this.barrierLabel,
       this.barrierColor = _kBarrierColor,
@@ -242,6 +251,8 @@ class SheetPage<T> extends Page<T> {
       this.willPopThreshold = _kWillPopThreshold,
       this.decorationBuilder})
       : transitionDuration = duration ?? _kSheetTransitionDuration,
+        reverseTransitionDuration =
+            reverseDuration ?? duration ?? _kSheetTransitionDuration,
         super(
           key: key,
           name: name,
@@ -293,6 +304,8 @@ class SheetPage<T> extends Page<T> {
   /// {@macro flutter.widgets.TransitionRoute.transitionDuration}
   final Duration transitionDuration;
 
+  final Duration reverseTransitionDuration;
+
   /// The semantic label used for a sheet modal route.
   final String? sheetLabel;
 
@@ -320,6 +333,7 @@ class SheetPage<T> extends Page<T> {
       draggable: draggable,
       animationCurve: animationCurve,
       duration: transitionDuration,
+      reverseDuration: reverseTransitionDuration,
       decorationBuilder: decorationBuilder,
     );
   }
@@ -339,6 +353,7 @@ class _PageBasedSheetRoute<T> extends SheetRoute<T> {
     bool barrierDismissible = true,
     bool draggable = true,
     Duration? duration,
+    Duration? reverseDuration,
     List<double>? stops,
     double initialExtent = 1,
     SheetDecorationBuilder? decorationBuilder,
@@ -354,6 +369,7 @@ class _PageBasedSheetRoute<T> extends SheetRoute<T> {
           draggable: draggable,
           animationCurve: animationCurve,
           duration: duration,
+          reverseDuration: reverseDuration,
           decorationBuilder: decorationBuilder,
         );
 
@@ -371,6 +387,7 @@ class _SheetRouteContainer extends StatefulWidget {
       : super(key: key);
 
   final SheetRoute<dynamic> sheetRoute;
+
   @override
   __SheetRouteContainerState createState() => __SheetRouteContainerState();
 }
@@ -378,9 +395,12 @@ class _SheetRouteContainer extends StatefulWidget {
 class __SheetRouteContainerState extends State<_SheetRouteContainer>
     with TickerProviderStateMixin {
   SheetRoute<dynamic> get route => widget.sheetRoute;
+
   SheetController get _sheetController => widget.sheetRoute._sheetController;
+
   AnimationController get _routeController =>
       widget.sheetRoute._routeAnimationController!;
+
   @override
   void initState() {
     _routeController.addListener(onRouteAnimationUpdate);
@@ -429,6 +449,7 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
   }
 
   bool _firstAnimation = true;
+
   void onRouteAnimationUpdate() {
     if (_routeController.isCompleted) {
       _firstAnimation = false;
@@ -442,7 +463,7 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
         final double animationValue = _routeController.value.mapDistance(
           fromLow: 0,
           fromHigh: 1,
-          toLow: _sheetController.animation.value,
+          toLow: _sheetController.animation.value.clamp(0, 1),
           toHigh: 1,
         );
         _sheetController.relativeJumpTo(animationValue);
@@ -451,7 +472,7 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
           fromLow: 0,
           fromHigh: 1,
           toLow: 0,
-          toHigh: _sheetController.animation.value,
+          toHigh: (_sheetController.animation.value).clamp(0, 1),
         );
         _sheetController.relativeJumpTo(animationValue);
       }
@@ -464,16 +485,16 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
     _sheetController.position.preventDrag();
     _sheetController.relativeAnimateTo(
       1,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+      duration: widget.sheetRoute.transitionDuration,
+      curve: widget.sheetRoute.animationCurve ?? Curves.easeInOut,
     );
     route.willPop().then(
       (RoutePopDisposition disposition) {
         if (disposition == RoutePopDisposition.pop) {
           _sheetController.relativeAnimateTo(
             0,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
+            duration: widget.sheetRoute.transitionDuration,
+            curve: widget.sheetRoute.animationCurve ?? Curves.easeOutQuart,
           );
         } else {
           _sheetController.position.stopPreventingDrag();

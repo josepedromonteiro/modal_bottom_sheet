@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -93,31 +94,44 @@ class _CupertinoSheetDecorationBuilder extends StatelessWidget {
 ///
 /// * [CupertinoSheetPage], which is the [Page] version of this class
 class CupertinoSheetRoute<T> extends SheetRoute<T> {
+  Radius topRadius;
+  SheetController? scontroller;
+  bool canDrag;
+  bool disableTopPadding;
+
   CupertinoSheetRoute(
       {required WidgetBuilder builder,
       List<double>? stops,
       double initialStop = 1,
       RouteSettings? settings,
       Color? backgroundColor,
+      this.canDrag = true,
       bool maintainState = true,
+      this.topRadius = _kCupertinoSheetTopRadius,
+      Curve? animationCurve,
+      this.scontroller,
+      Duration duration = const Duration(milliseconds: 600),
+      Duration reverseDuration = const Duration(milliseconds: 500),
+      this.disableTopPadding = false,
       super.fit})
       : super(
-          builder: (BuildContext context) {
-            return _CupertinoSheetDecorationBuilder(
-              child: Builder(builder: builder),
-              backgroundColor: backgroundColor,
-              topRadius: _kCupertinoSheetTopRadius,
-            );
-          },
-          settings: settings,
-          animationCurve: _kCupertinoSheetCurve,
-          stops: stops,
-          initialExtent: initialStop,
-          maintainState: maintainState,
-        );
+            builder: (BuildContext context) {
+              return _CupertinoSheetDecorationBuilder(
+                child: Builder(builder: builder),
+                backgroundColor: backgroundColor,
+                topRadius: topRadius,
+              );
+            },
+            settings: settings,
+            animationCurve: animationCurve ?? _kCupertinoSheetCurve,
+            stops: stops,
+            initialExtent: initialStop,
+            maintainState: maintainState,
+            duration: duration,
+            reverseDuration: reverseDuration);
 
   @override
-  bool get draggable => true;
+  bool get draggable => canDrag;
 
   final SheetController _sheetController = SheetController();
 
@@ -134,25 +148,28 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
 
   @override
   Widget buildSheet(BuildContext context, Widget child) {
+    List<double> stops_ = stops ?? <double>[0, 1];
     SheetPhysics? effectivePhysics = BouncingSheetPhysics(
         parent: SnapSheetPhysics(
-      stops: stops ?? <double>[0, 1],
+      stops: stops_,
       parent: physics,
     ));
     if (!draggable) {
       effectivePhysics = const NeverDraggableSheetPhysics();
     }
     final MediaQueryData mediaQuery = MediaQuery.of(context);
-    final double topMargin =
-        math.max(_kSheetMinimalOffset, mediaQuery.padding.top) +
-            _kPreviousRouteVisibleOffset;
+    final double topMargin = math.max(_kSheetMinimalOffset,
+            disableTopPadding ? 0 : mediaQuery.padding.top) +
+        _kPreviousRouteVisibleOffset;
     return Sheet.raw(
       initialExtent: initialExtent,
       decorationBuilder: decorationBuilder,
       fit: fit,
-      maxExtent: mediaQuery.size.height - topMargin,
+      maxExtent: disableTopPadding
+          ? (mediaQuery.size.height) * (stops?.last ?? 1)
+          : mediaQuery.size.height - topMargin,
       physics: effectivePhysics,
-      controller: sheetController,
+      controller: scontroller ?? sheetController,
       child: child,
     );
   }
@@ -164,7 +181,8 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final double topPadding = MediaQuery.of(context).padding.top;
+    final double topPadding =
+        this.disableTopPadding ? 0 : MediaQuery.of(context).padding.top;
     final double topOffset = math.max(_kSheetMinimalOffset, topPadding);
     return AnimatedBuilder(
       animation: secondaryAnimation,
@@ -174,7 +192,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
       ),
       builder: (BuildContext context, Widget? child) {
         final double progress = secondaryAnimation.value;
-        final double scale = 1 - progress / 10;
+        final double scale = 1 - progress / (disableTopPadding ? 20 : 10);
         final double distanceWithScale =
             (topOffset + _kPreviousRouteVisibleOffset) * 0.9;
         final Offset offset =
@@ -218,6 +236,8 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
       body: child,
       sheetAnimation: delayAnimation,
       secondaryAnimation: secondaryAnimation,
+      topRadius: topRadius,
+      disableTopPadding: disableTopPadding,
     );
   }
 }
@@ -225,24 +245,28 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
 /// Animation for previous route when a [CupertinoSheetRoute] enters/exits
 @visibleForTesting
 class CupertinoSheetBottomRouteTransition extends StatelessWidget {
-  const CupertinoSheetBottomRouteTransition({
-    Key? key,
-    required this.sheetAnimation,
-    required this.secondaryAnimation,
-    required this.body,
-  }) : super(key: key);
+  const CupertinoSheetBottomRouteTransition(
+      {Key? key,
+      required this.sheetAnimation,
+      required this.secondaryAnimation,
+      required this.body,
+      required this.topRadius,
+      required this.disableTopPadding})
+      : super(key: key);
 
   final Widget body;
 
   final Animation<double> sheetAnimation;
   final Animation<double> secondaryAnimation;
+  final Radius topRadius;
+  final bool disableTopPadding;
 
   // Currently iOS does not provide any way to detect the radius of the
   // screen device. Right not we detect if the safe area has the size
   // for the device that contain a notch as they are the ones rigth
   // now that has corners with radius
   Radius _getRadiusForDevice(MediaQueryData mediaQuery) {
-    final double topPadding = mediaQuery.padding.top;
+    final double topPadding = disableTopPadding ? 0 : mediaQuery.padding.top;
     // Round corners for iPhone devices from X to the newest version
     final bool isRoundedDevice = defaultTargetPlatform == TargetPlatform.iOS &&
         topPadding > _kRoundedDeviceStatusBarHeight;
@@ -251,7 +275,8 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double topPadding = MediaQuery.of(context).padding.top;
+    final double topPadding =
+        disableTopPadding ? 0 : MediaQuery.of(context).padding.top;
     final double topOffset = math.max(_kSheetMinimalOffset, topPadding);
     final Radius deviceCorner = _getRadiusForDevice(MediaQuery.of(context));
 
@@ -270,7 +295,7 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
           final double scale = 1 - progress / 10;
           final Radius radius = progress == 0
               ? Radius.zero
-              : Radius.lerp(deviceCorner, _kCupertinoSheetTopRadius, progress)!;
+              : Radius.lerp(deviceCorner, topRadius, progress)!;
           return Stack(
             children: <Widget>[
               Container(color: CupertinoColors.black),
@@ -291,7 +316,29 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
                             .withOpacity(secondaryAnimation.value * 0.1),
                         BlendMode.srcOver,
                       ),
-                      child: child,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(child: child ?? SizedBox.shrink()),
+                          // Positioned.fill(child: BackdropFilter(
+                          //   filter: ImageFilter.blur(
+                          //       sigmaY: (secondaryAnimation.value - progress) * 10.0 + 0.00001,
+                          //       sigmaX: (secondaryAnimation.value - progress) * 10.0 +0.000001
+                          //   ),
+                          //   child: Container(),
+                          // )),
+                          if (secondaryAnimation.value > 0)
+                            Positioned.fill(
+                                child: Container(
+                              decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onBackground
+                                      .withOpacity((secondaryAnimation.value -
+                                              progress) *
+                                          .4)),
+                            ))
+                        ],
+                      ),
                     ),
                   ),
                 ),
