@@ -253,12 +253,7 @@ class SheetPage<T> extends Page<T> {
       this.decorationBuilder})
       : transitionDuration = duration ?? _kSheetTransitionDuration,
         reverseTransitionDuration =
-            reverseDuration ?? duration ?? _kSheetTransitionDuration,
-        super(
-          key: key,
-          name: name,
-          arguments: arguments,
-        );
+            reverseDuration ?? duration ?? _kSheetTransitionDuration;
 
   /// Relative extent up to where the sheet is animated when pushed for
   /// the first time.
