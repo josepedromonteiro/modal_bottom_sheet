@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sheet/route.dart';
 import 'package:sheet/sheet.dart';
@@ -27,7 +28,7 @@ const Color _kBarrierColor = Color(0x59000000);
 /// See also:
 ///
 ///  * [SheetPage], which is a [Page] of this class.
-///  * [CupertinoSheetRoute], which is has an iOS appareance
+///  * [CupertinoSheetRoute], which is has an iOS appearance
 class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
   SheetRoute({
     required this.builder,
@@ -46,11 +47,11 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
     this.maintainState = true,
     this.willPopThreshold = _kWillPopThreshold,
     this.decorationBuilder,
-    RouteSettings? settings,
+    super.settings,
   })  : transitionDuration = duration ?? _kSheetTransitionDuration,
         reverseTransitionDuration =
             reverseDuration ?? _kSheetTransitionDuration,
-        super(settings: settings, fullscreenDialog: true);
+        super(fullscreenDialog: true);
 
   /// Builds the primary contents of the route.
   final WidgetBuilder builder;
@@ -88,7 +89,7 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
 
   /// Drag threshold to block any interaction if [Route.willPop] returns false
   /// See also:
-  ///   * [WillPopScope], that allow to block an attemp to close a [ModalRoute]
+  ///   * [WillPopScope], that allow to block an attempt to close a [ModalRoute]
   final double willPopThreshold;
 
   /// {@macro flutter.widgets.TransitionRoute.transitionDuration}
@@ -101,7 +102,7 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
   /// The semantic label used for a sheet modal route.
   final String? sheetLabel;
 
-  /// Wraps the child in a custom sheet decoration appareance
+  /// Wraps the child in a custom sheet decoration appearance
   ///
   /// The default value is null.
   final SheetDecorationBuilder? decorationBuilder;
@@ -233,9 +234,9 @@ class SheetPage<T> extends Page<T> {
   const SheetPage(
       {required this.child,
       this.maintainState = true,
-      LocalKey? key,
-      String? name,
-      Object? arguments,
+      super.key,
+      super.name,
+      super.arguments,
       this.initialExtent = 1,
       this.stops,
       this.draggable = true,
@@ -298,7 +299,7 @@ class SheetPage<T> extends Page<T> {
 
   /// Drag threshold to block any interaction if [Route.willPop] returns false
   /// See also:
-  ///   * [WillPopScope], that allow to block an attemp to close a [ModalRoute]
+  ///   * [WillPopScope], that allow to block an attempt to close a [ModalRoute]
   final double willPopThreshold;
 
   /// {@macro flutter.widgets.TransitionRoute.transitionDuration}
@@ -315,7 +316,7 @@ class SheetPage<T> extends Page<T> {
 
   final String? barrierLabel;
 
-  /// Wraps the child in a custom sheet decoration appareance
+  /// Wraps the child in a custom sheet decoration appearance
   ///
   /// The default value is null.
   final SheetDecorationBuilder? decorationBuilder;
@@ -383,8 +384,7 @@ class _PageBasedSheetRoute<T> extends SheetRoute<T> {
 }
 
 class _SheetRouteContainer extends StatefulWidget {
-  const _SheetRouteContainer({Key? key, required this.sheetRoute})
-      : super(key: key);
+  const _SheetRouteContainer({required this.sheetRoute});
 
   final SheetRoute<dynamic> sheetRoute;
 
@@ -412,7 +412,6 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
         curve: route.animationCurve ?? Curves.easeOut,
       );
     });
-
     super.initState();
   }
 
@@ -426,8 +425,11 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
   void onSheetExtentUpdate() {
     if (_routeController.value != _sheetController.animation.value) {
       if (route.isCurrent &&
+          !_firstAnimation &&
           !_sheetController.position.preventingDrag &&
-          route.shouldPreventPopForExtent(_sheetController.animation.value)) {
+          route.shouldPreventPopForExtent(_sheetController.animation.value) &&
+          _sheetController.position.userScrollDirection ==
+              ScrollDirection.forward) {
         preventPop();
         return;
       }
@@ -440,9 +442,10 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
           toHigh: 1,
         );
         _routeController.value = animationValue;
-
         if (_sheetController.animation.value == 0) {
-          widget.sheetRoute.navigator?.pop();
+          _routeController.value = 0.001;
+          _routeController.animateBack(0);
+          route.navigator?.pop();
         }
       }
     }
@@ -457,6 +460,8 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
     if (!_routeController.isAnimating) {
       return;
     }
+    // widget.sheetRoute.navigator!.userGestureInProgressNotifier.value = false;
+
     if (!_firstAnimation &&
         _routeController.value != _sheetController.animation.value) {
       if (_routeController.status == AnimationStatus.forward) {
@@ -483,11 +488,12 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
   @protected
   void preventPop() {
     _sheetController.position.preventDrag();
-    _sheetController.relativeAnimateTo(
-      1,
+    _sheetController.position.animateTo(
+      _sheetController.position.maxScrollExtent,
       duration: widget.sheetRoute.transitionDuration,
       curve: widget.sheetRoute.animationCurve ?? Curves.easeInOut,
     );
+
     route.willPop().then(
       (RoutePopDisposition disposition) {
         if (disposition == RoutePopDisposition.pop) {
