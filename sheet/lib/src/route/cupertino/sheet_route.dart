@@ -97,6 +97,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
   SheetController? scontroller;
   bool canDrag;
   bool disableTopPadding;
+  Color? overlayColor;
 
   CupertinoSheetRoute(
       {required WidgetBuilder builder,
@@ -104,6 +105,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
       double initialStop = 1,
       RouteSettings? settings,
       Color? backgroundColor,
+      this.overlayColor,
       this.canDrag = true,
       bool maintainState = true,
       this.topRadius = _kCupertinoSheetTopRadius,
@@ -237,6 +239,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
       secondaryAnimation: secondaryAnimation,
       topRadius: topRadius,
       disableTopPadding: disableTopPadding,
+      overlayColor: overlayColor,
     );
   }
 }
@@ -250,7 +253,8 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
       required this.secondaryAnimation,
       required this.body,
       required this.topRadius,
-      required this.disableTopPadding})
+      required this.disableTopPadding,
+      this.overlayColor})
       : super(key: key);
 
   final Widget body;
@@ -259,6 +263,7 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
   final Animation<double> secondaryAnimation;
   final Radius topRadius;
   final bool disableTopPadding;
+  final Color? overlayColor;
 
   // Currently iOS does not provide any way to detect the radius of the
   // screen device. Right not we detect if the safe area has the size
@@ -329,9 +334,9 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
                             Positioned.fill(
                                 child: Container(
                               decoration: BoxDecoration(
-                                  color: Theme.of(context)
+                                  color: (overlayColor ?? Theme.of(context)
                                       .colorScheme
-                                      .onBackground
+                                      .onBackground)
                                       .withOpacity((secondaryAnimation.value -
                                               progress) *
                                           .4)),
