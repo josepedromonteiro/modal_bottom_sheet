@@ -25,6 +25,8 @@ import 'package:sheet/src/widgets/min_interaction.dart';
 abstract class SheetContext extends ScrollContext {
   double? get initialExtent;
   SheetPosition get position;
+  bool get initialAnimationFinished;
+  set initialAnimationFinished(bool initialAnimationFinished);
 }
 
 /// A widget that transform to user drag.
@@ -326,6 +328,9 @@ class SheetState extends State<SheetScrollable>
   @override
   AxisDirection get axisDirection => widget.axisDirection;
 
+  @override
+  bool initialAnimationFinished = false;
+
   late SheetBehavior _configuration;
   ScrollPhysics? _physics;
   SheetController? _fallbackScrollController;
@@ -404,7 +409,7 @@ class SheetState extends State<SheetScrollable>
     return newPhysics.shouldReload(oldPhysics);
   }
 
-  bool _shouldUpdatePosition(SheetScrollable oldWidget) {
+  bool _shouldUpdatePositionBasedOnPhysics(SheetScrollable oldWidget) {
     ScrollPhysics? newPhysics =
         widget.physics ?? widget.scrollBehavior?.getScrollPhysics(context);
     ScrollPhysics? oldPhysics = oldWidget.physics ??
@@ -417,6 +422,16 @@ class SheetState extends State<SheetScrollable>
     } while (newPhysics != null || oldPhysics != null);
 
     return widget.controller?.runtimeType != oldWidget.controller?.runtimeType;
+  }
+
+  bool _shouldUpdatePositionBasedOnInitialExtent(SheetScrollable oldWidget) {
+    return widget.initialExtent != oldWidget.initialExtent;
+    // return false;
+  }
+
+  bool _shouldUpdatePosition(SheetScrollable oldWidget) {
+    return _shouldUpdatePositionBasedOnPhysics(oldWidget) ||
+        _shouldUpdatePositionBasedOnInitialExtent(oldWidget);
   }
 
   @override
@@ -752,10 +767,6 @@ class SheetState extends State<SheetScrollable>
 
   @override
   double? get initialExtent => widget.initialExtent;
-
-  // @override
-  // TODO: implement devicePixelRatio
-  // double get devicePixelRatio => MediaQuery.of(context).devicePixelRatio;
 }
 
 /// With [_ScrollSemantics] certain child [SemanticsNode]s can be
@@ -779,7 +790,7 @@ class _ScrollSemantics extends SingleChildRenderObjectWidget {
     required this.allowImplicitScrolling,
     required this.semanticChildCount,
     super.child,
-  })  : assert(semanticChildCount == null || semanticChildCount >= 0);
+  }) : assert(semanticChildCount == null || semanticChildCount >= 0);
 
   final ScrollPosition position;
   final bool allowImplicitScrolling;
@@ -870,10 +881,7 @@ class _RenderScrollSemantics extends RenderProxyBox {
       return;
     }
 
-    _innerNode ??= SemanticsNode(showOnScreen: showOnScreen);
-    _innerNode!
-      // ..isMergedIntoParent = node.isPartOfNodeMerging
-      .rect = node.rect;
+    (_innerNode ??= SemanticsNode(showOnScreen: showOnScreen)).rect = node.rect;
 
     int? firstVisibleIndex;
     final List<SemanticsNode> excluded = <SemanticsNode>[_innerNode!];

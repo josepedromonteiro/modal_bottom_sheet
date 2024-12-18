@@ -19,6 +19,7 @@ import 'package:sheet/sheet.dart';
 
 import 'examples/route/examples/modal_with_nested_scroll.dart';
 import 'examples/route/navigation/go_router.dart';
+import 'examples/route/navigation/go_router_advanced.dart';
 
 class RouteExamplePage extends StatelessWidget {
   const RouteExamplePage({super.key});
@@ -81,6 +82,16 @@ class RouteExamplePage extends StatelessWidget {
                       onTap: () => Navigator.of(context).push(
                         MaterialExtendedPageRoute<void>(
                           builder: (BuildContext context) => GoRouterBooksApp(),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text('Go router - ShellRoutes'),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          fullscreenDialog: true,
+                          builder: (BuildContext context) =>
+                              AdvancedGoRouterBooksApp(),
                         ),
                       ),
                     ),
@@ -223,8 +234,8 @@ class RouteExamplePage extends StatelessWidget {
                       ),
                     ),
                     ListTile(
-                      title: const Text(
-                          'Cupertino Navigator + Scroll + WillPopScope'),
+                      title:
+                          const Text('Cupertino Navigator + Scroll + PopScope'),
                       onTap: () => Navigator.of(context).push(
                         CupertinoSheetRoute<void>(
                           builder: (BuildContext context) =>
@@ -233,7 +244,7 @@ class RouteExamplePage extends StatelessWidget {
                       ),
                     ),
                     ListTile(
-                      title: const Text('Modal with WillPopScope'),
+                      title: const Text('Modal with PopScope'),
                       onTap: () => Navigator.of(context).push(
                         CupertinoSheetRoute<void>(
                           builder: (BuildContext context) =>
@@ -242,7 +253,7 @@ class RouteExamplePage extends StatelessWidget {
                       ),
                     ),
                     ListTile(
-                      title: const Text('Modal Fit with WillPopScope'),
+                      title: const Text('Modal Fit with PopScope'),
                       onTap: () => Navigator.of(context).push(
                         CupertinoSheetRoute<void>(
                           fit: SheetFit.loose,
@@ -313,11 +324,10 @@ class RouteExamplePage extends StatelessWidget {
 class SectionTitle extends StatelessWidget {
   final String title;
 
-  // ignore: sort_constructors_first
   const SectionTitle(
     this.title, {
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
   @override
   Widget build(BuildContext context) {
     return Padding(

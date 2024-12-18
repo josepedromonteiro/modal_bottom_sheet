@@ -19,6 +19,8 @@ class SheetPrimaryScrollController extends ScrollController {
   SheetPrimaryScrollController({
     super.initialScrollOffset,
     super.debugLabel,
+    super.onAttach,
+    super.onDetach,
     required this.sheetContext,
   });
 
@@ -120,7 +122,12 @@ class SheetPrimaryScrollPosition extends ScrollPositionWithSingleContext {
     }
 
     if (sheetPosition.hasContentDimensions) {
-      sheetPosition.goBallistic(velocity);
+      if (sheetContext.initialAnimationFinished) {
+        sheetPosition.goBallistic(velocity);
+      } else {
+        goIdle();
+        return;
+      }
     }
 
     if (velocity > 0.0 &&

@@ -1,61 +1,57 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
-/// Widget that that will scroll to the top the ScrollController
+typedef StatusBarGestureDetectorCallback = void Function(BuildContext context);
+
+/// Widget that that will make the [scrollController] to scroll the top
 /// when tapped on the status bar
 ///
-/// Extracted from Scaffold and used in modal bottom sheet
-class ScrollToTopStatusBarHandler extends StatefulWidget {
-  final Widget child;
-  final ScrollController scrollController;
-
-  const ScrollToTopStatusBarHandler({
+/// Extracted from [Scaffold] and used in [Sheet]
+class StatusBarGestureDetector extends StatefulWidget {
+  const StatusBarGestureDetector({
     super.key,
     required this.child,
-    required this.scrollController,
+    required this.onTap,
   });
 
+  final Widget child;
+
+  final StatusBarGestureDetectorCallback onTap;
+
   @override
-  ScrollToTopStatusBarState createState() => ScrollToTopStatusBarState();
+  State<StatusBarGestureDetector> createState() =>
+      _StatusBarGestureDetectorState();
 }
 
-class ScrollToTopStatusBarState extends State<ScrollToTopStatusBarHandler> {
+class _StatusBarGestureDetectorState extends State<StatusBarGestureDetector> {
+  final OverlayPortalController controller = OverlayPortalController();
+
   @override
   void initState() {
+    controller.show();
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        widget.child,
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: MediaQuery.of(context).padding.top,
-          child: Builder(
-            builder: (context) => GestureDetector(
+    final view = View.of(context);
+    return OverlayPortal.targetsRootOverlay(
+      controller: controller,
+      overlayChildBuilder: (context) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: view.padding.top / view.devicePixelRatio,
+            width: double.infinity,
+            child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _handleStatusBarTap(context),
+              onTap: () => widget.onTap(context),
               // iOS accessibility automatically adds scroll-to-top to the clock in the status bar
               excludeFromSemantics: true,
             ),
           ),
-        ),
-      ],
+        );
+      },
+      child: widget.child,
     );
-  }
-
-  void _handleStatusBarTap(BuildContext context) {
-    final controller = widget.scrollController;
-    if (controller.hasClients) {
-      controller.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.linear, // TODO(ianh): Use a more appropriate curve.
-      );
-    }
   }
 }

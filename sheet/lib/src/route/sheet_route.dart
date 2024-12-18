@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -188,7 +190,8 @@ class SheetRoute<T> extends PageRoute<T> with DelegatedTransitionsRoute<T> {
   @protected
   bool shouldPreventPopForExtent(double extent) {
     return extent < willPopThreshold &&
-        hasScopedWillPopCallback &&
+        (hasScopedWillPopCallback ||
+            popDisposition == RoutePopDisposition.doNotPop) &&
         controller!.velocity <= 0;
   }
 
@@ -372,6 +375,9 @@ class _PageBasedSheetRoute<T> extends SheetRoute<T> {
   SheetPage<T> get _page => settings as SheetPage<T>;
 
   @override
+  WidgetBuilder get builder => (context) => _page.child;
+
+  @override
   bool get maintainState => _page.maintainState;
 
   @override
@@ -401,11 +407,18 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
     _routeController.addListener(onRouteAnimationUpdate);
     _sheetController.addListener(onSheetExtentUpdate);
     WidgetsBinding.instance.addPostFrameCallback((Duration timeStamp) {
-      _sheetController.relativeAnimateTo(
+      _sheetController
+          .relativeAnimateTo(
         route.initialExtent,
         duration: route.transitionDuration,
         curve: route.animationCurve ?? Curves.easeOut,
-      );
+      )
+          .then((_) {
+        if (_sheetController.hasClients) {
+          (_sheetController.position.context as SheetContext)
+              .initialAnimationFinished = true;
+        }
+      });
     });
     super.initState();
   }
@@ -488,20 +501,24 @@ class __SheetRouteContainerState extends State<_SheetRouteContainer>
       duration: widget.sheetRoute.transitionDuration,
       curve: widget.sheetRoute.animationCurve ?? Curves.easeInOut,
     );
-
-    route.willPop().then(
-      (RoutePopDisposition disposition) {
-        if (disposition == RoutePopDisposition.pop) {
-          _sheetController.relativeAnimateTo(
-            0,
-            duration: widget.sheetRoute.transitionDuration,
-            curve: widget.sheetRoute.animationCurve ?? Curves.easeOutQuart,
-          );
-        } else {
-          _sheetController.position.stopPreventingDrag();
-        }
-      },
-    );
+    if (route.popDisposition == RoutePopDisposition.doNotPop) {
+      _sheetController.position.stopPreventingDrag();
+      route.onPopInvoked(false);
+    } else {
+      route.willPop().then(
+        (RoutePopDisposition disposition) {
+          if (disposition == RoutePopDisposition.pop) {
+            _sheetController.relativeAnimateTo(
+              0,
+              duration: widget.sheetRoute.transitionDuration,
+              curve: widget.sheetRoute.animationCurve ?? Curves.easeOutQuart,
+            );
+          } else {
+            _sheetController.position.stopPreventingDrag();
+          }
+        },
+      );
+    }
   }
 
   @override

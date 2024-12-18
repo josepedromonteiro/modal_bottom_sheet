@@ -9,6 +9,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:meta/meta.dart';
 import 'package:sheet/route.dart';
 import 'package:sheet/sheet.dart';
 
@@ -245,7 +246,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
 }
 
 /// Animation for previous route when a [CupertinoSheetRoute] enters/exits
-@visibleForTesting
+@internal
 class CupertinoSheetBottomRouteTransition extends StatelessWidget {
   const CupertinoSheetBottomRouteTransition(
       {Key? key,
@@ -404,7 +405,10 @@ class _PageBasedCupertinoSheetRoute<T> extends CupertinoSheetRoute<T> {
     super.maintainState,
   }) : super(
           settings: page,
-          builder: (BuildContext context) => page.child,
+          builder: (BuildContext context) {
+            return (ModalRoute.of(context)!.settings as CupertinoSheetPage<T>)
+                .child;
+          },
         );
 
   CupertinoSheetPage<T> get _page => settings as CupertinoSheetPage<T>;

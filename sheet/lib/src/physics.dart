@@ -139,6 +139,10 @@ class BouncingSheetPhysics extends ScrollPhysics with SheetPhysics {
       }
       return true;
     }());
+    // Prevent scrolling beyond the maximum position
+    if (value > position.maxScrollExtent) {
+      return value - position.maxScrollExtent;
+    }
     if (!overflowViewport) {
       // overscroll
       if (position.viewportDimension <= position.pixels &&
@@ -412,6 +416,16 @@ class SnapSheetPhysics extends ScrollPhysics with SheetPhysics {
   bool shouldReload(covariant ScrollPhysics old) {
     return old is SnapSheetPhysics &&
         (old.relative != relative || !listEquals(old.stops, stops));
+  }
+
+  @override
+  double adjustPositionForNewDimensions(
+      {required ScrollMetrics oldPosition,
+      required ScrollMetrics newPosition,
+      required bool isScrolling,
+      required double velocity}) {
+    final Tolerance tolerance = toleranceFor(newPosition);
+    return _getTargetPixels(newPosition, tolerance, velocity);
   }
 
   double _getTargetPixels(
