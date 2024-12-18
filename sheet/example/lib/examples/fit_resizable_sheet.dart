@@ -37,7 +37,7 @@ class _FitSheetState extends State<FitResizableSheet> {
   @override
   Widget build(BuildContext context) {
     return BaseScaffold(
-      showBottomBar: false,
+      // showBottomBar: false,
       title: const Text('Fit Resizable Sheet'),
       sheet: Sheet(
         elevation: 4,

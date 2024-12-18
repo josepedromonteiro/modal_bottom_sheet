@@ -40,6 +40,8 @@ const double _kRoundedDeviceStatusBarHeight = 20;
 const Curve _kCupertinoSheetCurve = Curves.easeOutExpo;
 const Curve _kCupertinoTransitionCurve = Curves.linear;
 
+const Color _kStackBackgroundColor = CupertinoColors.black;
+
 /// Wraps the child into a cupertino modal sheet appearance. This is used to
 /// create a [SheetRoute].
 ///
@@ -99,6 +101,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
   bool canDrag;
   bool disableTopPadding;
   Color? overlayColor;
+  Color? stackBackgroundColor;
 
   CupertinoSheetRoute(
       {required WidgetBuilder builder,
@@ -107,6 +110,7 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
       RouteSettings? settings,
       Color? backgroundColor,
       this.overlayColor,
+      this.stackBackgroundColor,
       this.canDrag = true,
       bool maintainState = true,
       this.topRadius = _kCupertinoSheetTopRadius,
@@ -235,13 +239,13 @@ class CupertinoSheetRoute<T> extends SheetRoute<T> {
     );
 
     return CupertinoSheetBottomRouteTransition(
-      body: child,
-      sheetAnimation: delayAnimation,
-      secondaryAnimation: secondaryAnimation,
-      topRadius: topRadius,
-      disableTopPadding: disableTopPadding,
-      overlayColor: overlayColor,
-    );
+        body: child,
+        sheetAnimation: delayAnimation,
+        secondaryAnimation: secondaryAnimation,
+        topRadius: topRadius,
+        disableTopPadding: disableTopPadding,
+        overlayColor: overlayColor,
+        stackBackgroundColor: stackBackgroundColor);
   }
 }
 
@@ -255,7 +259,8 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
       required this.body,
       required this.topRadius,
       required this.disableTopPadding,
-      this.overlayColor})
+      this.overlayColor,
+      this.stackBackgroundColor})
       : super(key: key);
 
   final Widget body;
@@ -265,6 +270,7 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
   final Radius topRadius;
   final bool disableTopPadding;
   final Color? overlayColor;
+  final Color? stackBackgroundColor;
 
   // Currently iOS does not provide any way to detect the radius of the
   // screen device. Right not we detect if the safe area has the size
@@ -303,7 +309,7 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
               : Radius.lerp(deviceCorner, topRadius, progress)!;
           return Stack(
             children: <Widget>[
-              Container(color: CupertinoColors.black),
+              Container(color: stackBackgroundColor ?? _kStackBackgroundColor),
               // TODO(jaime): Add ColorFilter based on CupertinoUserInterfaceLevelData
               // https://github.com/jamesblasco/modal_bottom_sheet/pull/44/files
               Transform.translate(
@@ -335,9 +341,11 @@ class CupertinoSheetBottomRouteTransition extends StatelessWidget {
                             Positioned.fill(
                                 child: Container(
                               decoration: BoxDecoration(
-                                  color: (overlayColor ?? Theme.of(context)
-                                      .colorScheme
-                                      .onBackground)
+                                borderRadius: BorderRadius.vertical(top: (stackBackgroundColor?.opacity ?? 1) < 1 ? topRadius : Radius.zero),
+                                  color: (overlayColor ??
+                                          Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)
                                       .withOpacity((secondaryAnimation.value -
                                               progress) *
                                           .4)),
